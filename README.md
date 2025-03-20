@@ -283,10 +283,9 @@ flowchart TD
 #### **Assumptions**
 1. **Dataset Size:**  
    - **25 hours of WAV audio** at **60fps** (frames per second).  
-   - Total frames:  
-     $$
-     25 \, \text{hours} \times 3600 \, \text{seconds/hour} \times 60 \, \text{frames/second} = 5,400,000 \, \text{frames}.
-     $$
+   - Total frames:
+
+   <span style="display: inline-block;">$$25 \, \text{hours} \times 3600 \, \text{seconds/hour} \times 60 \, \text{frames/second} = 5,400,000 \, \text{frames}.$$</span>
 
 2. **Model Architecture:**  
    - **Cross-Attentive Transformer-XL** with **50M parameters**.  
@@ -302,11 +301,9 @@ flowchart TD
 
 
 #### **Step 3.1: Training Iterations**
-- **Iterations per Epoch:**  
-  $$
-  \text{Iterations per epoch} = \frac{5,400,000}{512 \times 16} = 660 \, \text{iterations per epoch}.
-  $$
+- **Iterations per Epoch:** 
 
+  <span style="display: inline-block;">$$ \text{Iterations per epoch} = \frac{5,400,000}{512 \times 16} = 660 \, \text{iterations per epoch}.$$</span>
 
 #### **Step 3.2: FLOPs for Training**
 - **FLOPs per Iteration:**  
@@ -314,26 +311,20 @@ flowchart TD
   - Backpropagation typically doubles this, so **20 TFLOPs per iteration**.  
 
 - **Total FLOPs for Training (1300 epochs):**  
-  $$
-  660 \times 1300 \times 20 = 17,160,000 \, \text{TFLOPs}.
-  $$
+  <span style="display: inline-block;">$$660 \times 1300 \times 20 = 17,160,000 \, \text{TFLOPs}.$$</span>
 
 #### **Step 3.3: Text Processing and Embedding Generation**
 #### **Text Transcription (Whisper):**
 - **Whisper FLOPs:**  
   - Whisper is a lightweight model compared to Transformers. For **25 hours of audio**, transcription typically takes **~1.25 hours** on a V100 GPU.  
   - FLOPs for transcription:  
-    $$
-    1.25 \, \text{hours} \times 3600 \, \text{seconds/hour} \times 125 \, \text{TFLOPs/s} = 562,500 \, \text{TFLOPs}.
-    $$
+    <span style="display: inline-block;">$$1.25 \, \text{hours} \times 3600 \, \text{seconds/hour} \times 125 \, \text{TFLOPs/s} = 562,500 \, \text{TFLOPs}.$$</span>
 
 #### **Embedding Generation (LLaMA2):**
 - **LLaMA2 FLOPs:**  
   - LLaMA2 is computationally expensive. For **25 hours of audio**, generating embeddings for all words takes approximately **~6.25 hours** on a V100 GPU.  
   - FLOPs for embedding generation:  
-    $$
-    6.25 \, \text{hours} \times 3600 \, \text{seconds/hour} \times 125 \, \text{TFLOPs/s} = 2,812,500 \, \text{TFLOPs}.
-    $$
+    <span style="display: inline-block;">$$6.25 \, \text{hours} \times 3600 \, \text{seconds/hour} \times 125 \, \text{TFLOPs/s} = 2,812,500 \, \text{TFLOPs}.$$</span>
 
 
 #### **Step 3.4: Total FLOPs**
@@ -342,25 +333,19 @@ flowchart TD
 - **Embedding Generation FLOPs:** 2,812,500 TFLOPs.  
 
 - **Total FLOPs:**  
-  $$
-  17,160,000 + 562,500 + 2,812,500 = 20,535,000 \, \text{TFLOPs}.
-  $$
+  <span style="display: inline-block;">$$17,160,000 + 562,500 + 2,812,500 = 20,535,000 \, \text{TFLOPs}.$$</span>
 
 
 #### **Step 3.5: Training Time**
 - **GPU Performance:** 125 TFLOPs/s.  
 - **Total Training Time:**  
-  $$
-  \frac{20,535,000}{125} = 164,280 \, \text{seconds} \approx 45.63 \, \text{hours}.
-  $$
+  <span style="display: inline-block;">$$\frac{20,535,000}{125} = 164,280 \, \text{seconds} \approx 45.63 \, \text{hours}.$$</span>
 
 #### **Step 3.6: Accounting for Overheads**
 - **I/O Overhead and Optimization:**  
   - Data loading, preprocessing, and checkpointing can add **~20-30% overhead**.  
   - Adjusted training time:  
-    $$
-    45.63 \, \text{hours} \times 1.25 = 57.04 \, \text{hours} \approx 2.38 \, \text{days}.
-    $$
+    <span style="display: inline-block;">$$45.63 \, \text{hours} \times 1.25 = 57.04 \, \text{hours} \approx 2.38 \, \text{days}.$$</span>
 
 
 #### **Final Summary**
