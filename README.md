@@ -142,7 +142,7 @@ flowchart TD
     classDef combine fill:#5C6BC0,color:white,stroke:#3949AB,stroke-width:2px
     classDef model fill:#8D6E63,color:white,stroke:#5D4037,stroke-width:2px
 ```
-![SVG 1](./data/resources/1.svg)
+
 
 - **Transcription**: We use Whisper to transcribe `.wav` files into text, as the dataset lacks transcripts.
 - **Alignment**: The Montreal Forced Aligner (MFA) extracts word-level timings, aligning them with motion frames at 30fps (as per the paper’s 33ms frame rate).
@@ -209,7 +209,7 @@ flowchart BT
     classDef leftLabel fill:none,stroke:none,color:#2E7D32,font-weight:bold
 ```
 
-![SVG 2](./data/resources/2.svg)
+
 
 
 ### Step 2: Model Architecture – LLaMA2 Embeddings and Cross-Attentive Transformer-XL
@@ -271,7 +271,6 @@ flowchart TD
     classDef motion fill:#66BB6A,color:white,stroke:#388E3C,stroke-width:2px
 ```
 
-![SVG 3](./data/resources/3.svg)
 
 
 - **Smoothing**: A Savitzky-Golay filter (window length 9, polynomial order 2) reduces high-frequency noise in the output, ensuring the gestures look natural and fluid.
@@ -555,7 +554,7 @@ graph TD
     classDef loss_low fill:#66BB6A,color:white,stroke:#388E3C,stroke-width:2px
 ```
 
-![SVG 4](./data/resources/4.svg)
+
 
 ## Future Roadmap: 3-6 Months to State-of-the-Art
 
