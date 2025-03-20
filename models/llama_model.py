@@ -7,7 +7,7 @@ load_dotenv()
 
 class LLaMAModel:
     def __init__(self, model_name, device, cache_dir=None):
-        self.use_auth_token = "REMOVED"
+        self.use_auth_token = ""
         if not self.use_auth_token:
             raise ValueError("HF_AUTH_TOKEN not found in .env file.")
         
