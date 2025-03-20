@@ -1,0 +1,26 @@
+model:
+  d_model: 512
+  n_heads: 8
+  n_layers: 6
+  d_ff: 2048
+  dropout: 0.1
+  num_joints: 9
+  fps: 30
+
+training:
+  learning_rate: 0.001
+  epochs: 10
+  batch_size: 16
+  weight_decay: 0.01
+  pos_weight: 1.0
+  rot_weight: 1.0
+  vel_weight: 0.5
+  acc_weight: 0.2
+  kin_weight: 0.5
+
+paths:
+  dataset_dir: "data/datasets/zaos1"
+  alignments_dir: "data/alignments"
+  pase_checkpoint: "config/FE_e199.ckpt"  # Path to pre-trained POSE+ checkpoint
+  pase_config: "config/pase_config.cfg"   # Path to PASE+.cfg
+  llama_model: "meta-llama/Llama-2-7b-hf"
