@@ -303,7 +303,7 @@ flowchart TD
 #### **Step 3.1: Training Iterations**
 - **Iterations per Epoch:** 
 
-  <span style="display: inline-block;">$$ \text{Iterations per epoch} = \frac{5,400,000}{512 \times 16} = 660 \, \text{iterations per epoch}.$$</span>
+  <span style="display: inline-block;">$$\text{Iterations per epoch} = \frac{5,400,000}{512 \times 16} = 660 \, \text{iterations per epoch}.$$</span>
 
 #### **Step 3.2: FLOPs for Training**
 - **FLOPs per Iteration:**  
