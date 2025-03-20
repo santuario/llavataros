@@ -13,7 +13,7 @@ class Trainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         # Initialize models
-        self.pase = PASEModel(config['paths']['pase_config'], config['paths']['pase_checkpoint']).to(self.device)
+        self.pase = PASEModel(config['paths']['pase_config'], config['paths']['pase_checkpoint'], self.device)
         self.llama = LLaMAModel(config['paths']['llama_model'], self.device)
         self.model = CrossAttentiveTransformerXL(config, self.device)
         
@@ -41,49 +41,29 @@ class Trainer:
         )
     
     def loss_function(self, pred, target, lengths):
-        """
-        Compute loss with masking for padded regions.
-        Args:
-            pred: Model predictions, shape (batch_size, seq_len, 7 * num_joints)
-            target: Target poses, shape (batch_size, max_motion_length, 7 * num_joints)
-            lengths: Original sequence lengths, shape (batch_size,)
-        """
-        # Create mask to exclude padded regions (True for padded, False for valid)
         max_len = target.size(1)
         mask = torch.arange(max_len, device=self.device).expand(len(lengths), max_len) < lengths.unsqueeze(1)
-        mask = mask.unsqueeze(-1).expand_as(target)  # Shape: (batch_size, max_len, 7 * num_joints)
+        mask = mask.unsqueeze(-1).expand_as(target)
         
-        # Ensure pred and target have compatible sequence lengths
         if pred.size(1) < target.size(1):
             pred = torch.nn.functional.pad(pred, (0, 0, 0, target.size(1) - pred.size(1)))
         elif pred.size(1) > target.size(1):
             pred = pred[:, :target.size(1), :]
         
-        # Separate position (px, py, pz) and rotation (qx, qy, qz, qw) assuming 7 values per joint
         num_features = target.size(-1)
-        pos_dim = 3  # px, py, pz
-        rot_dim = num_features - pos_dim  # qx, qy, qz, qw per joint
+        pos_dim = 3
+        rot_dim = num_features - pos_dim
         
-        # Position loss
         pos_loss = torch.mean(torch.abs(pred[:, :, :pos_dim] - target[:, :, :pos_dim]) * mask[:, :, :pos_dim])
-        
-        # Rotation loss
         rot_loss = torch.mean(torch.abs(pred[:, :, pos_dim:] - target[:, :, pos_dim:]) * mask[:, :, pos_dim:])
-        
-        # Velocity loss (first derivative)
         pred_diff = torch.diff(pred, dim=1)
         target_diff = torch.diff(target, dim=1)
         velocity_loss = torch.mean(torch.abs(pred_diff - target_diff) * mask[:, :-1, :])
-        
-        # Acceleration loss (second derivative)
         pred_acc = torch.diff(pred, dim=1, n=2)
         target_acc = torch.diff(target, dim=1, n=2)
         accel_loss = torch.mean(torch.abs(pred_acc - target_acc) * mask[:, :-2, :])
-        
-        # Kinetic loss (squared difference on rotations)
         kinetic_loss = torch.mean(((pred[:, :, pos_dim:] - target[:, :, pos_dim:]) ** 2) * mask[:, :, pos_dim:])
         
-        # Combine losses with weights (optional: tune these in config)
         total_loss = (
             self.config['training'].get('pos_weight', 1.0) * pos_loss +
             self.config['training'].get('rot_weight', 1.0) * rot_loss +
@@ -91,7 +71,6 @@ class Trainer:
             self.config['training'].get('acc_weight', 0.2) * accel_loss +
             self.config['training'].get('kin_weight', 0.5) * kinetic_loss
         )
-        
         return total_loss
     
     def train(self):
@@ -107,54 +86,65 @@ class Trainer:
                 if max_batches and batch_count >= max_batches:
                     break
                 
-                # Unpack batch with lengths
-                waveform, transcript, word_timings, target_poses, speaker_ids, waveform_lengths, motion_lengths = batch
+                waveform, transcripts, word_timings_list, target_poses, speaker_ids, waveform_lengths, motion_lengths = batch
                 
-                # Move to device
                 waveform = waveform.to(self.device)
                 target_poses = target_poses.to(self.device)
                 speaker_ids = speaker_ids.to(self.device)
                 waveform_lengths = waveform_lengths.to(self.device)
                 motion_lengths = motion_lengths.to(self.device)
                 
-                # Extract features
-                audio_feats = self.pase.extract_features(waveform, target_length=motion_lengths.max().item())
-                text_feats = self.llama.extract_features(transcript[0], word_timings, self.config['model']['fps'])
+                max_motion_length = motion_lengths.max().item()
+                audio_feats = self.pase.extract_features(waveform, target_length=max_motion_length)
                 
-                # Forward pass with sequence lengths
+                batch_size = len(transcripts)
+                text_feats_list = []
+                for i in range(batch_size):
+                    try:
+                        text_feats = self.llama.extract_features(
+                            transcripts[i],
+                            word_timings_list[i],
+                            self.config['model']['fps']
+                        )
+                        # Interpolate text_feats to match max_motion_length
+                        if text_feats.size(0) != max_motion_length:
+                            text_feats = torch.nn.functional.interpolate(
+                                text_feats.unsqueeze(0).transpose(1, 2),
+                                size=max_motion_length,
+                                mode='linear',
+                                align_corners=False
+                            ).transpose(1, 2).squeeze(0)
+                    except ValueError as e:
+                        print(f"Error processing transcript {i}: {e}. Using fallback.")
+                        text_feats = self.llama.extract_features(transcripts[i], [], self.config['model']['fps'])
+                    text_feats_list.append(text_feats)
+                
+                text_feats = torch.stack(text_feats_list).to(self.device)
+                
                 self.optimizer.zero_grad()
                 pred, _ = self.model(
                     audio_feats,
                     text_feats,
                     speaker_ids,
-                    audio_lengths=waveform_lengths,
-                    text_lengths=motion_lengths  # Proxy for text_feats length
+                    audio_lengths=motion_lengths,
+                    text_lengths=motion_lengths
                 )
                 loss = self.loss_function(pred, target_poses, motion_lengths)
                 
-                # Backward pass
                 loss.backward()
-                
-                # Gradient clipping
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-                
                 self.optimizer.step()
                 
-                # Update running loss
                 total_loss += loss.item()
                 batch_count += 1
-                
                 print(f"Epoch {epoch+1}/{epochs}, Batch {batch_count}, Loss: {loss.item():.4f}")
             
-            # Epoch summary
             avg_loss = total_loss / batch_count
             print(f"Epoch {epoch+1}/{epochs}, Average Loss: {avg_loss:.4f}")
             
-            # Step scheduler
             if not self.test_run:
                 self.scheduler.step(avg_loss)
         
-        # Save model
         save_path = "llavataros_model.pth" if self.test_run else f"llavataros_model_epoch_{epochs}.pth"
         torch.save(self.model.state_dict(), save_path)
         print(f"Model saved to {save_path}")

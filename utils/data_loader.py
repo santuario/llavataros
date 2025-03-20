@@ -9,16 +9,10 @@ from utils.aligner import MontrealForcedAligner
 class GestureDataset(Dataset):
     def __init__(self, dataset_dir, alignments_dir):
         self.dataset_dir = dataset_dir
-        
-        # Step 1: Transcribe audio files
         transcriber = WhisperTranscriber(model_size="base")
         self.transcript_map = transcriber.transcribe_dataset(dataset_dir)
-        
-        # Step 2: Align transcripts with audio
         self.aligner = MontrealForcedAligner(dataset_dir, alignments_dir, self.transcript_map)
         self.aligner.align()
-        
-        # Step 3: Load dataset files
         self.files = [f for f in os.listdir(dataset_dir) if f.endswith('.npy')]
     
     def __len__(self):
@@ -28,23 +22,19 @@ class GestureDataset(Dataset):
         npy_file = os.path.join(self.dataset_dir, self.files[idx])
         wav_file = npy_file.replace('.npy', '.wav')
         
-        # Load motion data
-        motion = np.load(npy_file)  # Shape: (num_frames, num_points, 7)
-        motion = torch.tensor(motion, dtype=torch.float32)  # [px, py, pz, qx, qy, qz, qw]
-        motion = motion.view(motion.shape[0], -1)  # Flatten to (num_frames, num_points * 7)
+        motion = np.load(npy_file)
+        motion = torch.tensor(motion, dtype=torch.float32)
+        motion = motion.view(motion.shape[0], -1)
         
-        # Load audio
         waveform, _ = torchaudio.load(wav_file)
         
-        # Load transcript
         transcript_path = self.transcript_map[wav_file]
         with open(transcript_path, "r", encoding="utf-8") as f:
             transcript = f.read().strip()
         
-        # Get word timings
         word_timings = self.aligner.get_word_timings(wav_file)
+        print(f"word_timings for {wav_file}: {word_timings}")  # Debug
         
-        # Speaker ID (simplified)
         speaker_id = torch.tensor([0], dtype=torch.long)
         
         return waveform, transcript, word_timings, motion, speaker_id
