@@ -3,7 +3,6 @@ import torch.nn as nn
 import torchaudio
 from pase.pase.models.frontend import wf_builder
 
-
 class PASEModel(nn.Module):
     def __init__(self, config_path, checkpoint_path, device=None):
         super().__init__()
@@ -28,21 +27,22 @@ class PASEModel(nn.Module):
         waveform = waveform.to(self.device)
         return self.model(waveform)
 
-    def extract_features(self, waveform):
+    def extract_features(self, waveform, target_length=None):
         """
-        Extracts PASE features and aligns them to 30 fps.
+        Extracts PASE features and aligns them to a target length (default 30 fps).
         
         Args:
-            waveform (torch.Tensor): Input waveform tensor of shape [1, 1, num_samples]
+            waveform (torch.Tensor): Input waveform tensor of shape [batch_size, 1, num_samples]
+            target_length (int, optional): Desired number of frames for output
 
         Returns:
-            torch.Tensor: Aligned features of shape [expected_frames, 256]
+            torch.Tensor: Aligned features of shape [batch_size, target_length, 256]
         """
         # Ensure waveform is on the correct device
         waveform = waveform.to(self.device)
 
         # Resample waveform if the sample rate is different
-        waveform_rate = waveform.shape[-1]
+        waveform_rate = self.sample_rate  # Assuming input is already at target rate; adjust if needed
         if waveform_rate != self.sample_rate:
             resampler = torchaudio.transforms.Resample(
                 orig_freq=waveform_rate, new_freq=self.sample_rate
@@ -51,22 +51,25 @@ class PASEModel(nn.Module):
 
         # Extract features
         with torch.no_grad():
-            features = self.forward(waveform)  # Shape: (1, 256, num_frames)
+            features = self.forward(waveform)  # Shape: (batch_size, 256, num_frames)
 
-        # Align features to 30 fps
+        # Determine target length
+        if target_length is None:
+            # Default: align to 30 fps based on waveform duration
+            target_length = int((waveform.shape[-1] / self.sample_rate) * self.fps)
+        
+        # Align features to target_length
         num_frames = features.shape[-1]
-        expected_frames = int((waveform.shape[-1] / self.sample_rate) * self.fps)
-
-        if num_frames != expected_frames:
-            # Only interpolate if there's a frame mismatch
+        if num_frames != target_length:
+            # Ensure 3D input for interpolation: (batch_size, channels, length)
             features = torch.nn.functional.interpolate(
-                features.unsqueeze(0),
-                size=expected_frames,
+                features,  # Shape: (batch_size, 256, num_frames)
+                size=target_length,
                 mode='linear',
                 align_corners=False
-            ).squeeze(0)
+            )  # Shape: (batch_size, 256, target_length)
 
-        # Reshape to [expected_frames, 256]
+        # Transpose to [batch_size, target_length, 256]
         return features.transpose(1, 2).contiguous()
 
     @staticmethod

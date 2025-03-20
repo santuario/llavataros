@@ -118,7 +118,7 @@ class Trainer:
                 motion_lengths = motion_lengths.to(self.device)
                 
                 # Extract features
-                audio_feats = self.pase.extract_features(waveform)
+                audio_feats = self.pase.extract_features(waveform, target_length=motion_lengths.max().item())
                 text_feats = self.llama.extract_features(transcript[0], word_timings, self.config['model']['fps'])
                 
                 # Forward pass with sequence lengths
