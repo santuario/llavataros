@@ -1,7 +1,7 @@
 import torch
 import os
 from dotenv import load_dotenv
-from transformers import LlamaTokenizer, LlamaModel
+from transformers import LlamaTokenizerFast, LlamaModel  # Use LlamaTokenizerFast
 
 load_dotenv()
 
@@ -12,7 +12,8 @@ class LLaMAModel:
             raise ValueError("HF_AUTH_TOKEN not found in .env file.")
         
         try:
-            self.tokenizer = LlamaTokenizer.from_pretrained(
+            # Use LlamaTokenizerFast instead of LlamaTokenizer
+            self.tokenizer = LlamaTokenizerFast.from_pretrained(
                 model_name,
                 use_auth_token=self.use_auth_token,
                 cache_dir=cache_dir
@@ -24,23 +25,25 @@ class LLaMAModel:
             ).to(device)
             self.model.eval()
             self.device = device
-            print(f"Successfully loaded model: {model_name}")
+            print(f"Successfully loaded model: {model_name} with fast tokenizer")
         except Exception as e:
-            print(f"Error loading model: {str(e)}")
+            print(f"Error loading model or tokenizer: {str(e)}")
             raise
 
     def extract_features(self, transcript, word_timings, fps=30):
         if not transcript or not isinstance(transcript, str):
             raise ValueError("Transcript must be a non-empty string.")
         
+        # Tokenize with fast tokenizer
         inputs = self.tokenizer(transcript, return_tensors="pt", truncation=True, return_offsets_mapping=True)
         input_ids = inputs["input_ids"].to(self.device)
-        offsets = inputs["offset_mapping"][0]
+        offsets = inputs["offset_mapping"][0]  # Shape: (num_tokens, 2)
 
         with torch.no_grad():
             outputs = self.model(input_ids)
             embeddings = outputs.last_hidden_state.squeeze(0)  # Shape: (num_tokens, 4096)
 
+        # Map words to tokens
         word_to_token_mapping = []
         current_word_idx = 0
         transcript_words = transcript.split()
@@ -61,6 +64,7 @@ class LLaMAModel:
                     else:
                         current_word_idx += 1
 
+        # Align embeddings to fps
         if not word_timings or not isinstance(word_timings, list) or not all(
             isinstance(t, tuple) and len(t) == 3 for t in word_timings
         ):
