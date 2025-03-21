@@ -60,5 +60,5 @@ class MontrealForcedAligner:
             if interval.mark and interval.mark.strip():
                 word_timings.append((interval.mark, interval.minTime, interval.maxTime))
         
-        print(f"Extracted word_timings: {word_timings}")
+        #print(f"Extracted word_timings: {word_timings}")
         return word_timings

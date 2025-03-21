@@ -26,21 +26,21 @@ class GestureDataset(Dataset):
         motion = torch.tensor(motion, dtype=torch.float32)
         motion = motion.view(motion.shape[0], -1)
         
-        waveform, _ = torchaudio.load(wav_file)
+        waveform, sample_rate = torchaudio.load(wav_file)  # Capture sample_rate
         
         transcript_path = self.transcript_map[wav_file]
         with open(transcript_path, "r", encoding="utf-8") as f:
             transcript = f.read().strip()
         
         word_timings = self.aligner.get_word_timings(wav_file)
-        print(f"word_timings for {wav_file}: {word_timings}")  # Debug
+        print(f"word_timings for {wav_file}: {word_timings}")
         
         speaker_id = torch.tensor([0], dtype=torch.long)
         
-        return waveform, transcript, word_timings, motion, speaker_id
+        return waveform, transcript, word_timings, motion, speaker_id, sample_rate
 
 def collate_fn(batch):
-    waveforms, transcripts, word_timings_list, motions, speaker_ids = zip(*batch)
+    waveforms, transcripts, word_timings_list, motions, speaker_ids, sample_rates = zip(*batch)
     
     waveform_lengths = torch.tensor([w.shape[1] for w in waveforms], dtype=torch.long)
     max_waveform_length = max(waveform_lengths)
@@ -56,8 +56,9 @@ def collate_fn(batch):
         padded_motions[i, :motion.shape[0], :] = motion
     
     speaker_ids = torch.stack(speaker_ids)
+    sample_rates = torch.tensor(sample_rates, dtype=torch.long)
     
-    return padded_waveforms, transcripts, word_timings_list, padded_motions, speaker_ids, waveform_lengths, motion_lengths
+    return padded_waveforms, transcripts, word_timings_list, padded_motions, speaker_ids, waveform_lengths, motion_lengths, sample_rates
 
 def get_data_loader(dataset_dir, alignments_dir, batch_size):
     dataset = GestureDataset(dataset_dir, alignments_dir)

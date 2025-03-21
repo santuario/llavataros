@@ -17,11 +17,14 @@ class PASEModel(nn.Module):
         waveform = waveform.to(self.device)
         return self.model(waveform)
 
-    def extract_features(self, waveform, target_length=None):
+    def extract_features(self, waveform, sample_rate, target_length=None):
         waveform = waveform.to(self.device)
-        if waveform.shape[-1] != self.sample_rate:
+        sample_rate = sample_rate.item() if sample_rate.dim() == 0 else sample_rate[0].item()  # Handle batched or scalar
+        
+        if sample_rate != self.sample_rate:
             resampler = torchaudio.transforms.Resample(
-                orig_freq=waveform.shape[-1], new_freq=self.sample_rate
+                orig_freq=sample_rate,
+                new_freq=self.sample_rate
             ).to(self.device)
             waveform = resampler(waveform)
 

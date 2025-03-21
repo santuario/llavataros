@@ -12,19 +12,16 @@ class Trainer:
         self.test_run = test_run
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # Initialize models
         self.pase = PASEModel(config['paths']['pase_config'], config['paths']['pase_checkpoint'], self.device)
         self.llama = LLaMAModel(config['paths']['llama_model'], self.device)
         self.model = CrossAttentiveTransformerXL(config, self.device)
         
-        # Optimizer
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(),
             lr=config['training']['learning_rate'],
             weight_decay=config['training'].get('weight_decay', 0.01)
         )
         
-        # Learning rate scheduler
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
             mode='min',
@@ -33,7 +30,6 @@ class Trainer:
             verbose=True
         )
         
-        # Data loader
         self.data_loader = get_data_loader(
             config['paths']['dataset_dir'],
             config['paths']['alignments_dir'],
@@ -86,16 +82,17 @@ class Trainer:
                 if max_batches and batch_count >= max_batches:
                     break
                 
-                waveform, transcripts, word_timings_list, target_poses, speaker_ids, waveform_lengths, motion_lengths = batch
+                waveform, transcripts, word_timings_list, target_poses, speaker_ids, waveform_lengths, motion_lengths, sample_rates = batch
                 
                 waveform = waveform.to(self.device)
                 target_poses = target_poses.to(self.device)
                 speaker_ids = speaker_ids.to(self.device)
                 waveform_lengths = waveform_lengths.to(self.device)
                 motion_lengths = motion_lengths.to(self.device)
+                sample_rates = sample_rates.to(self.device)
                 
                 max_motion_length = motion_lengths.max().item()
-                audio_feats = self.pase.extract_features(waveform, target_length=max_motion_length)
+                audio_feats = self.pase.extract_features(waveform, sample_rates, target_length=max_motion_length)
                 
                 batch_size = len(transcripts)
                 text_feats_list = []
@@ -106,7 +103,6 @@ class Trainer:
                             word_timings_list[i],
                             self.config['model']['fps']
                         )
-                        # Interpolate text_feats to match max_motion_length
                         if text_feats.size(0) != max_motion_length:
                             text_feats = torch.nn.functional.interpolate(
                                 text_feats.unsqueeze(0).transpose(1, 2),
